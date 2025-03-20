@@ -4,21 +4,21 @@ from sklearn.impute import KNNImputer
 
 RED = 'FFFFCCCC'
 PURPLE = 'FF6A5ACD'
-YELLOW = 'FFFFFF00'
+YELLOW = 'FFFFFF33'
 GRAY = 'FF808080'
 
-NUM_SAMPLES = 402
+NUM_SAMPLES = 323
 
 
 
 def read_data(file_path):
     wb = load_workbook(file_path)
-    ws = wb['With_Normalization']
+    ws = wb['NMR']
     
     data = pd.DataFrame(ws.values)
     data = data.iloc[:NUM_SAMPLES + 1, :]
-    data.columns = data.iloc[0]
-    data = data.drop(0)
+    data.columns = data.iloc[1]
+    data = data.drop([0, 1])
     data = data.reset_index(drop=True)
 
     # Use openpyxl to get the color of each cell
@@ -43,22 +43,21 @@ def drop_purple(data, colors):
     # 3. The proportion of purple cells in each group are within 10% of each other
 
     # Returns: list of column names to keep
-    AD_indices = data[data['Groups '] == 'AD'].index
-    MCI_indices = data[data['Groups '] == 'MCI'].index
-    Control_indices = data[data['Groups '] == 'Control'].index
+    PD_indices = data[data['ENROLLMENT_CATEGORY'] == 'PD'].index
+    NON_PD_indices = data[data['ENROLLMENT_CATEGORY'] == 'No PD'].index
 
     # Iterate through each column
     drop_cols = []
 
     for i in range(colors.shape[1] ):
         col = colors.iloc[:, i]
-        AD_purple = col[AD_indices] == PURPLE
-        MCI_purple = col[MCI_indices] == PURPLE
-        Control_purple = col[Control_indices] == PURPLE
+
+        PD_purple = col[PD_indices] == PURPLE
+        NON_PD_purple = col[NON_PD_indices] == PURPLE
 
         # Check if the column should be dropped
-        if (AD_purple.mean() > 0.5) and (MCI_purple.mean() > 0.5) and (Control_purple.mean() > 0.5):
-            if (abs(AD_purple.mean() - MCI_purple.mean()) < 0.1) and (abs(AD_purple.mean() - Control_purple.mean()) < 0.1):
+        if (PD_purple.mean() > 0.5) and (NON_PD_purple.mean() > 0.5):
+            if (abs(PD_purple.mean() - NON_PD_purple.mean()) < 0.1):
                 drop_cols.append(i)
 
     data[colors == PURPLE] = None
@@ -108,21 +107,20 @@ def replace_NA(data):
     return data
 
 if __name__ == '__main__':
-    file_path = 'Final_NMR_MS_Saliva_Data.xlsx'
+    file_path = 'PD_Serum_Metabolomics_Final_NMR.xlsx'
     data, colors = read_data(file_path)
 
     drop_cols = drop_purple(data, colors)
     data = data.drop(data.columns[drop_cols], axis=1)
     colors = colors.drop(colors.columns[drop_cols], axis=1)
-    labels = data['Groups ']
-    # Change labels so that they are 0, 1, 2
-    labels = labels.replace('Control', 0)
-    labels = labels.replace('MCI', 1)
-    labels = labels.replace('AD', 2)
+    labels = data['ENROLLMENT_CATEGORY']
+    # Change labels so that they are 0, 1
+    labels = labels.replace('PD', 1)
+    labels = labels.replace('No PD', 0)
 
-    # Additionally drop first three columns
-    data = data.drop(data.columns[:3], axis=1)
-    colors = colors.drop(colors.columns[:3], axis=1)
+    # Additionally drop first five columns
+    data = data.drop(data.columns[:5], axis=1)
+    colors = colors.drop(colors.columns[:5], axis=1)
 
     data = replace_NA(data)
     data = replace_gray(data, colors)
@@ -133,7 +131,7 @@ if __name__ == '__main__':
     
 
     df = pd.DataFrame(data, columns=col_names)
-    df.insert(0, 'Groups ', labels)
-    df.to_csv('preprocessed_data.csv', index=False)
+    df.insert(0, 'ENROLLMENT_CATEGORY', labels)
+    df.to_csv('preprocessed_data_PD.csv', index=False)
 
-    print('Preprocessing complete. Data saved to preprocessed_data.csv')
+    print('Preprocessing complete. Data saved to preprocessed_data_PD.csv')
